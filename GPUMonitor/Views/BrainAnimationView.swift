@@ -72,9 +72,18 @@ final class BrainAnimationView: NSView {
         let w = bounds.width, h = bounds.height
         let unit = min(w, h) / 300.0
 
+        // Subtle bob — gentle at idle, more pronounced when working hard
+        let bobAmp  = unit * (2 + gpuLoad * 10)          // 2px idle → 12px at full load
+        let bobY    = sin(t * 1.4) * bobAmp
+        // Very slight sway left-right at high load
+        let swayAmp = unit * gpuLoad * 4
+        let swayX   = sin(t * 0.9 + 1.2) * swayAmp
+        // Tiny breathing scale
+        let breathScale = 1.0 + sin(t * 1.1) * (0.008 + gpuLoad * 0.012)
+
         ctx.saveGState()
-        ctx.translateBy(x: w / 2, y: h / 2)
-        ctx.scaleBy(x: unit, y: unit)
+        ctx.translateBy(x: w / 2 + swayX, y: h / 2 + bobY)
+        ctx.scaleBy(x: breathScale * unit, y: breathScale * unit)
 
         drawBrainBody(ctx)
         drawEdges(ctx)
