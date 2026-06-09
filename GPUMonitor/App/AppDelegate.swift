@@ -1,13 +1,18 @@
 import AppKit
+import Combine
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: FloatingPanel?
     private var dashVC: DashboardViewController?
+    private var statusItem: NSStatusItem?
+    private var cancellables = Set<AnyCancellable>()
+    private var isPanelVisible = true
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let vc = DashboardViewController()
         dashVC = vc
 
+        // ── Floating panel ──────────────────────────────────────────
         let panelRect = savedFrame() ?? defaultFrame()
         let panel = FloatingPanel(
             contentRect: panelRect,
@@ -18,22 +23,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.contentViewController = vc
         panel.setFrame(panelRect, display: false)
         panel.makeKeyAndOrderFront(nil)
-
-        // Context menu
         panel.contentView?.menu = buildContextMenu()
-
-        // Persist position on close / move
         NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(windowMoved),
-            name: NSWindow.didMoveNotification,
-            object: panel
-        )
-
+            self, selector: #selector(windowMoved),
+            name: NSWindow.didMoveNotification, object: panel)
         self.panel = panel
+
+        // ── Menu bar status item ─────────────────────────────────────
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        if let btn = statusItem?.button {
+            btn.title = "GPU –%"
+            btn.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .medium)
+            btn.action = #selector(statusBarClicked)
+            btn.target = self
+        }
+
+        // Subscribe to GPU % for live status bar readout
+        vc.monitor.$latest
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] snap in
+                let pct = Int(snap.gpuUtilization * 100)
+                self?.statusItem?.button?.title = "GPU \(pct)%"
+            }
+            .store(in: &cancellables)
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    // MARK: - Status bar toggle
+
+    @objc private func statusBarClicked() {
+        guard let panel else { return }
+        if isPanelVisible {
+            panel.orderOut(nil)
+        } else {
+            panel.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        isPanelVisible.toggle()
+    }
 
     // MARK: - Context Menu
 
@@ -43,8 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let rateMenu = NSMenu()
         for (title, interval) in [("0.5s", 0.5), ("1s (default)", 1.0), ("2s", 2.0)] {
             let item = NSMenuItem(title: title, action: #selector(setRefreshRate(_:)), keyEquivalent: "")
-            item.representedObject = interval
-            item.target = self
+            item.representedObject = interval; item.target = self
             rateMenu.addItem(item)
         }
         let rateItem = NSMenuItem(title: "Refresh Rate", action: nil, keyEquivalent: "")
@@ -53,8 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let opacityMenu = NSMenu()
         for (title, alpha) in [("100%", 1.0), ("80%", 0.8), ("60%", 0.6), ("40%", 0.4)] {
             let item = NSMenuItem(title: title, action: #selector(setOpacity(_:)), keyEquivalent: "")
-            item.representedObject = alpha
-            item.target = self
+            item.representedObject = alpha; item.target = self
             opacityMenu.addItem(item)
         }
         let opacityItem = NSMenuItem(title: "Opacity", action: nil, keyEquivalent: "")
@@ -63,15 +89,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(rateItem)
         menu.addItem(opacityItem)
         menu.addItem(.separator())
-        let quitItem = NSMenuItem(title: "Quit GPU Monitor", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        menu.addItem(quitItem)
+        let ssItem = NSMenuItem(title: "▶  Start Screen Saver", action: #selector(startScreenSaver), keyEquivalent: "s")
+        ssItem.target = self
+        menu.addItem(ssItem)
+        menu.addItem(.separator())
+        menu.addItem(NSMenuItem(title: "Quit GPU Monitor",
+                                action: #selector(NSApplication.terminate(_:)),
+                                keyEquivalent: "q"))
         return menu
+    }
+
+    @objc func startScreenSaver() {
+        NSWorkspace.shared.open(
+            URL(fileURLWithPath: "/System/Library/CoreServices/ScreenSaverEngine.app"))
     }
 
     @objc private func setRefreshRate(_ sender: NSMenuItem) {
         guard let interval = sender.representedObject as? Double else { return }
-        (dashVC?.view as? NSView)  // access monitor through VC if needed
-        UserDefaults.standard.set(interval, forKey: "refreshInterval")
+        dashVC?.monitor.refreshInterval = interval
     }
 
     @objc private func setOpacity(_ sender: NSMenuItem) {
@@ -91,17 +126,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let screen = NSScreen.main ?? NSScreen.screens[0]
         let visible = screen.visibleFrame
         let w: CGFloat = 680, h: CGFloat = 280
-        // Top-right corner, inset 20pt from edges
-        return NSRect(
-            x: visible.maxX - w - 20,
-            y: visible.maxY - h - 20,
-            width: w, height: h
-        )
+        return NSRect(x: visible.maxX - w - 20, y: visible.maxY - h - 20, width: w, height: h)
     }
 
     private func savedFrame() -> NSRect? {
         guard let s = UserDefaults.standard.string(forKey: "panelFrame") else { return nil }
-        let r = NSRectFromString(s)
-        return r == .zero ? nil : r
+        let r = NSRectFromString(s); return r == .zero ? nil : r
     }
 }

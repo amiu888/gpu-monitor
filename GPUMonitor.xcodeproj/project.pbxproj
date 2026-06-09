@@ -23,6 +23,7 @@
 		AA000000000000000000047 /* GaugeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000046 /* GaugeView.swift */; };
 		AA000000000000000000049 /* SparklineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000048 /* SparklineView.swift */; };
 		AA000000000000000000051 /* LLMStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000050 /* LLMStatusView.swift */; };
+		AA000000000000000000053 /* BrainAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000052 /* BrainAnimationView.swift */; };
 		AA000000000000000000061 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000012 /* Info.plist */; };
 		AA000000000000000000062 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000013 /* AppIcon.icns */; };
 		BB100000000000000000001 /* GPUMonitorSaverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000001 /* GPUMonitorSaverView.swift */; };
@@ -39,6 +40,7 @@
 		BB100000000000000000012 /* GaugeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000046 /* GaugeView.swift */; };
 		BB100000000000000000013 /* SparklineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000048 /* SparklineView.swift */; };
 		BB100000000000000000014 /* LLMStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000050 /* LLMStatusView.swift */; };
+		BB100000000000000000016 /* BrainAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000052 /* BrainAnimationView.swift */; };
 		BB100000000000000000015 /* ScreenSaver.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB000000000000000000003 /* ScreenSaver.framework */; };
 /* End PBXBuildFile section */
 
@@ -61,6 +63,7 @@
 		AA000000000000000000046 /* GaugeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GaugeView.swift; sourceTree = "<group>"; };
 		AA000000000000000000048 /* SparklineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparklineView.swift; sourceTree = "<group>"; };
 		AA000000000000000000050 /* LLMStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMStatusView.swift; sourceTree = "<group>"; };
+		AA000000000000000000052 /* BrainAnimationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainAnimationView.swift; sourceTree = "<group>"; };
 		AA000000000000000000060 /* GPUMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GPUMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB000000000000000000001 /* GPUMonitorSaverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPUMonitorSaverView.swift; sourceTree = "<group>"; };
 		BB000000000000000000002 /* Saver-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Saver-Info.plist; sourceTree = "<group>"; };
@@ -151,6 +154,7 @@
 				AA000000000000000000046 /* GaugeView.swift */,
 				AA000000000000000000048 /* SparklineView.swift */,
 				AA000000000000000000050 /* LLMStatusView.swift */,
+				AA000000000000000000052 /* BrainAnimationView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -278,6 +282,7 @@
 				AA000000000000000000047 /* GaugeView.swift in Sources */,
 				AA000000000000000000049 /* SparklineView.swift in Sources */,
 				AA000000000000000000051 /* LLMStatusView.swift in Sources */,
+				AA000000000000000000053 /* BrainAnimationView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -299,6 +304,7 @@
 				BB100000000000000000012 /* GaugeView.swift in Sources */,
 				BB100000000000000000013 /* SparklineView.swift in Sources */,
 				BB100000000000000000014 /* LLMStatusView.swift in Sources */,
+				BB100000000000000000016 /* BrainAnimationView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
