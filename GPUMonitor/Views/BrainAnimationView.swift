@@ -1,302 +1,229 @@
 import AppKit
 
-/// Animated kawaii brain character. Call `advance(by:)` each frame.
+/// Kawaii brain with neural-mapping blink animation.
+/// Lobes light up proportional to GPU/CPU load; LLM-active regions glow brighter.
 final class BrainAnimationView: NSView {
-    var gpuLoad: CGFloat = 0   // 0–1
-    var cpuLoad: CGFloat = 0   // 0–1
+
+    var gpuLoad:  CGFloat = 0   // 0–1
+    var cpuLoad:  CGFloat = 0   // 0–1
+    var llmOnGPU: Bool = false  // ollama running on GPU?
+    var llmOnCPU: Bool = false  // ollama running on CPU?
 
     private var t: CGFloat = 0
     private var eyeBlinkT: CGFloat = 0
     private var blinking = false
-    private var particleT: CGFloat = 0
 
-    // Simple particles for high-load sparks
-    private struct Particle {
-        var x, y, vx, vy, life, maxLife: CGFloat
-        var color: NSColor
+    // ── Brain nodes (normalised: 0,0 = brain centre, units ≈ pixels @ 300px brain) ──
+    struct Node {
+        let x, y: CGFloat
+        let r: CGFloat          // base radius
+        let color: NSColor
+        let phase: CGFloat      // blink phase offset
+        var llmWeight: CGFloat  // how much LLM activity boosts this node
     }
-    private var particles: [Particle] = []
+
+    private let nodes: [Node] = [
+        // top-left bump  (language / LLM primary)
+        Node(x: -50, y: 70, r: 28, color: NSColor(red:1,   green:0.55, blue:0.72, alpha:1), phase: 0.0,  llmWeight: 1.0),
+        // top-center-left
+        Node(x: -16, y: 82, r: 30, color: NSColor(red:1,   green:0.58, blue:0.75, alpha:1), phase: 0.7,  llmWeight: 0.8),
+        // top-center-right  (knowledge/memory)
+        Node(x:  20, y: 80, r: 30, color: NSColor(red:1,   green:0.88, blue:0.20, alpha:1), phase: 1.4,  llmWeight: 0.7),
+        // top-right bump  (reasoning)
+        Node(x:  56, y: 62, r: 26, color: NSColor(red:0.55, green:0.75, blue:1,   alpha:1), phase: 2.1,  llmWeight: 0.5),
+        // left temporal  (memory/context)
+        Node(x: -72, y:  8, r: 24, color: NSColor(red:0.65, green:0.40, blue:0.90, alpha:1), phase: 2.8, llmWeight: 0.9),
+        // right parietal (processing)
+        Node(x:  70, y: 12, r: 24, color: NSColor(red:0.55, green:0.75, blue:1,   alpha:1), phase: 3.5,  llmWeight: 0.4),
+        // center-left (motor / face)
+        Node(x: -26, y: -8, r: 22, color: NSColor(red:1,   green:0.72, blue:0.82, alpha:1), phase: 4.2,  llmWeight: 0.6),
+        // center-right (output)
+        Node(x:  28, y: -6, r: 22, color: NSColor(red:0.40, green:0.82, blue:0.45, alpha:1), phase: 4.9, llmWeight: 0.5),
+    ]
+
+    // Pairs of node indices that are connected
+    private let edges: [(Int,Int)] = [
+        (0,1),(1,2),(2,3),    // top arc
+        (0,4),(3,5),          // side drops
+        (4,6),(5,7),          // lower
+        (6,7),                // bottom bridge
+        (1,4),(2,5),          // diagonals
+        (0,6),(3,7),          // front cross
+    ]
 
     override var isFlipped: Bool { false }
 
-    /// Advance the animation clock by `dt` seconds.
+    // MARK: - Animation tick
+
     func advance(by dt: CGFloat) {
         t += dt
-
-        // Blink every ~4s
         eyeBlinkT += dt
-        if eyeBlinkT > 4.0 {
+        if eyeBlinkT > 3.8 {
             blinking = true
-            if eyeBlinkT > 4.12 { blinking = false; eyeBlinkT = 0 }
+            if eyeBlinkT > 3.95 { blinking = false; eyeBlinkT = 0 }
         }
-
-        // Spawn particles at high GPU load
-        particleT += dt
-        let spawnRate: CGFloat = gpuLoad > 0.6 ? 0.04 : 0.12
-        if particleT > spawnRate && gpuLoad > 0.3 {
-            particleT = 0
-            let colors: [NSColor] = [
-                NSColor(red: 0, green: 0.9, blue: 0.5, alpha: 1),
-                NSColor(red: 0.4, green: 0.6, blue: 1, alpha: 1),
-                NSColor(red: 1, green: 0.8, blue: 0, alpha: 1),
-                NSColor(red: 1, green: 0.3, blue: 0.8, alpha: 1),
-            ]
-            let angle = CGFloat.random(in: 0...(CGFloat.pi * 2))
-            let speed: CGFloat = 30 + CGFloat.random(in: 0...40) * gpuLoad
-            particles.append(Particle(
-                x: CGFloat.random(in: -30...30),
-                y: CGFloat.random(in: 20...60),
-                vx: cos(angle) * speed,
-                vy: sin(angle) * speed + 20,
-                life: 0, maxLife: 0.8 + CGFloat.random(in: 0...0.4),
-                color: colors.randomElement()!
-            ))
-        }
-
-        // Update particles
-        particles = particles.compactMap { var p = $0
-            p.life += dt
-            p.x += p.vx * dt
-            p.y += p.vy * dt
-            p.vy -= 60 * dt   // gravity
-            return p.life < p.maxLife ? p : nil
-        }
-
         needsDisplay = true
     }
 
+    // MARK: - Draw
+
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-
         let w = bounds.width, h = bounds.height
-        let unit = min(w, h) / 320.0
-
-        // Breathing scale
-        let breathAmp: CGFloat = 0.015 + gpuLoad * 0.025
-        let breathScale = 1.0 + sin(t * 1.3) * breathAmp
-
-        // Bounce Y – amplitude and speed scale with GPU%
-        let bounceAmp  = unit * (4 + gpuLoad * 28)
-        let bounceSpeed = 1.0 + gpuLoad * 3.5
-        let bounceY = sin(t * bounceSpeed * .pi) * bounceAmp
-
-        // Lateral wobble at high load
-        let wobbleX = gpuLoad > 0.5 ? sin(t * 7.3) * unit * gpuLoad * 8 : 0
+        let unit = min(w, h) / 300.0
 
         ctx.saveGState()
-        ctx.translateBy(x: w / 2 + wobbleX, y: h / 2 + bounceY)
-        ctx.scaleBy(x: breathScale * unit, y: breathScale * unit)
+        ctx.translateBy(x: w / 2, y: h / 2)
+        ctx.scaleBy(x: unit, y: unit)
 
-        drawGlow(ctx: ctx)
-        drawBrainBody(ctx: ctx)
-        drawFace(ctx: ctx)
-        drawParticles(ctx: ctx, unit: unit, bounceY: bounceY)
+        drawBrainBody(ctx)
+        drawEdges(ctx)
+        drawNodes(ctx)
+        drawFace(ctx)
 
         ctx.restoreGState()
     }
 
-    // MARK: - Drawing helpers
+    // MARK: - Activation helper
 
-    private func drawGlow(ctx: CGContext) {
-        let intensity = 0.15 + gpuLoad * 0.55
-        let radius: CGFloat = 90 + gpuLoad * 50
-        let colors = [
-            CGColor(red: 1, green: 0.5, blue: 0.8, alpha: intensity),
-            CGColor(red: 0, green: 0, blue: 0, alpha: 0)
-        ]
-        guard let gradient = CGGradient(
-            colorsSpace: CGColorSpaceCreateDeviceRGB(),
-            colors: colors as CFArray,
-            locations: [0, 1]
-        ) else { return }
-        ctx.drawRadialGradient(gradient,
-            startCenter: .zero, startRadius: 0,
-            endCenter: .zero, endRadius: radius,
-            options: [])
+    private func activation(for node: Node) -> CGFloat {
+        // Base neural blink: sine wave at node-specific frequency
+        let baseSpeed = 0.8 + gpuLoad * 2.5
+        let base = (sin(t * baseSpeed * .pi + node.phase) + 1) / 2  // 0–1
+
+        // LLM boost for language-heavy nodes
+        let llmBoost: CGFloat = (llmOnGPU || llmOnCPU) ? node.llmWeight * 0.5 : 0
+
+        // CPU load lifts memory nodes (4,5), GPU load lifts top nodes (0,1,2,3)
+        let cpuBoost = cpuLoad * (node.phase > 2.5 && node.phase < 4 ? 0.3 : 0.05)
+        let gpuBoost = gpuLoad * (node.phase < 2.5 ? 0.35 : 0.08)
+
+        return min(1, base * (0.4 + gpuLoad * 0.4) + llmBoost + cpuBoost + gpuBoost)
     }
 
-    private func drawBrainBody(ctx: CGContext) {
-        // ── Color sections (matching kawaii reference) ─────────────────
-        // Back-left purple lobe
-        drawLobe(ctx: ctx, cx: -55, cy: -20, rx: 55, ry: 50,
-                 color: NSColor(red: 0.65, green: 0.4, blue: 0.9, alpha: 1))
-        // Bottom-center green lobe
-        drawLobe(ctx: ctx, cx: 0, cy: -38, rx: 65, ry: 42,
-                 color: NSColor(red: 0.4, green: 0.8, blue: 0.3, alpha: 1))
-        // Right blue lobe
-        drawLobe(ctx: ctx, cx: 58, cy: -5, rx: 50, ry: 55,
-                 color: NSColor(red: 0.55, green: 0.75, blue: 1, alpha: 1))
-        // Upper-right yellow lobe
-        drawLobe(ctx: ctx, cx: 38, cy: 48, rx: 55, ry: 52,
-                 color: NSColor(red: 1, green: 0.85, blue: 0.25, alpha: 1))
-        // Main pink body (front / dominant)
-        drawMainBody(ctx: ctx)
+    // MARK: - Brain body
+
+    private func drawBrainBody(_ ctx: CGContext) {
+        // Back colour sections
+        drawLobe(ctx, cx: -54, cy: -18, rx: 54, ry: 50,
+                 color: NSColor(red:0.65, green:0.40, blue:0.90, alpha:0.85))
+        drawLobe(ctx, cx:   0, cy: -36, rx: 64, ry: 42,
+                 color: NSColor(red:0.40, green:0.82, blue:0.35, alpha:0.85))
+        drawLobe(ctx, cx:  58, cy:  -4, rx: 50, ry: 54,
+                 color: NSColor(red:0.55, green:0.75, blue:1.00, alpha:0.85))
+        drawLobe(ctx, cx:  38, cy:  48, rx: 54, ry: 50,
+                 color: NSColor(red:1.00, green:0.88, blue:0.25, alpha:0.85))
+        // Main pink body
+        ctx.addEllipse(in: CGRect(x: -80, y: -64, width: 160, height: 145))
+        ctx.setFillColor(NSColor(red:1, green:0.75, blue:0.82, alpha:1).cgColor)
+        ctx.fillPath()
         // Top bumps
-        drawTopBumps(ctx: ctx)
-        // Center divider crease
-        drawCrease(ctx: ctx)
+        for (bx, by, br): (CGFloat,CGFloat,CGFloat) in [(-70,55,31),(-34,72,35),(2,78,35),(38,70,33),(68,50,29)] {
+            ctx.addEllipse(in: CGRect(x:bx-br, y:by-br, width:br*2, height:br*2))
+            ctx.setFillColor(NSColor(red:1, green:0.72, blue:0.80, alpha:1).cgColor)
+            ctx.fillPath()
+        }
+        // Centre crease
+        ctx.setStrokeColor(NSColor(red:0.88, green:0.54, blue:0.64, alpha:0.55).cgColor)
+        ctx.setLineWidth(2.5)
+        let crease = CGMutablePath()
+        crease.move(to: CGPoint(x:0, y:75))
+        crease.addCurve(to: CGPoint(x:0, y:-30),
+                        control1: CGPoint(x:11, y:38), control2: CGPoint(x:-9, y:8))
+        ctx.addPath(crease); ctx.strokePath()
     }
 
-    private func drawLobe(ctx: CGContext, cx: CGFloat, cy: CGFloat,
+    private func drawLobe(_ ctx: CGContext, cx: CGFloat, cy: CGFloat,
                           rx: CGFloat, ry: CGFloat, color: NSColor) {
-        ctx.saveGState()
-        ctx.translateBy(x: cx, y: cy)
-        let path = CGMutablePath()
-        path.addEllipse(in: CGRect(x: -rx, y: -ry, width: rx*2, height: ry*2))
-        ctx.addPath(path)
-        ctx.setFillColor(color.cgColor)
-        ctx.fillPath()
-        ctx.restoreGState()
+        ctx.addEllipse(in: CGRect(x:cx-rx, y:cy-ry, width:rx*2, height:ry*2))
+        ctx.setFillColor(color.cgColor); ctx.fillPath()
     }
 
-    private func drawMainBody(ctx: CGContext) {
-        // Big pink blob – the face area
-        let path = CGMutablePath()
-        path.addEllipse(in: CGRect(x: -80, y: -65, width: 160, height: 145))
-        ctx.addPath(path)
-        ctx.setFillColor(NSColor(red: 1, green: 0.75, blue: 0.82, alpha: 1).cgColor)
-        ctx.fillPath()
+    // MARK: - Neural edges
 
-        // Subtle highlight top
-        let hPath = CGMutablePath()
-        hPath.addEllipse(in: CGRect(x: -50, y: 20, width: 100, height: 50))
-        ctx.addPath(hPath)
-        ctx.setFillColor(NSColor(white: 1, alpha: 0.25).cgColor)
-        ctx.fillPath()
-    }
+    private func drawEdges(_ ctx: CGContext) {
+        for (i, j) in edges {
+            let a = activation(for: nodes[i])
+            let b = activation(for: nodes[j])
+            let combined = (a + b) / 2
+            guard combined > 0.25 else { continue }
 
-    private func drawTopBumps(ctx: CGContext) {
-        let bumpColor = NSColor(red: 1, green: 0.72, blue: 0.80, alpha: 1).cgColor
-        let bumps: [(CGFloat, CGFloat, CGFloat)] = [
-            (-72, 55, 32), (-35, 72, 36), (0, 78, 36), (36, 70, 34), (68, 50, 30)
-        ]
-        for (bx, by, br) in bumps {
-            ctx.addEllipse(in: CGRect(x: bx-br, y: by-br, width: br*2, height: br*2))
-            ctx.setFillColor(bumpColor)
-            ctx.fillPath()
-        }
-        // Bump highlights
-        for (bx, by, br) in bumps {
-            ctx.addEllipse(in: CGRect(x: bx-br*0.4, y: by+br*0.1, width: br*0.7, height: br*0.4))
-            ctx.setFillColor(NSColor(white: 1, alpha: 0.30).cgColor)
-            ctx.fillPath()
+            let alpha = (combined - 0.25) / 0.75 * 0.7
+            let ni = nodes[i], nj = nodes[j]
+            ctx.setStrokeColor(NSColor.white.withAlphaComponent(alpha).cgColor)
+            ctx.setLineWidth(0.8 + combined * 1.5)
+            ctx.move(to: CGPoint(x: ni.x, y: ni.y))
+            ctx.addLine(to: CGPoint(x: nj.x, y: nj.y))
+            ctx.strokePath()
         }
     }
 
-    private func drawCrease(ctx: CGContext) {
-        ctx.saveGState()
-        ctx.setStrokeColor(NSColor(red: 0.9, green: 0.55, blue: 0.65, alpha: 0.6).cgColor)
-        ctx.setLineWidth(3)
-        let path = CGMutablePath()
-        path.move(to: CGPoint(x: 0, y: 75))
-        path.addCurve(to: CGPoint(x: 0, y: -30),
-                      control1: CGPoint(x: 12, y: 40),
-                      control2: CGPoint(x: -10, y: 10))
-        ctx.addPath(path)
-        ctx.strokePath()
-        ctx.restoreGState()
+    // MARK: - Neural nodes
+
+    private func drawNodes(_ ctx: CGContext) {
+        for node in nodes {
+            let act = activation(for: node)
+            guard act > 0.05 else { continue }
+
+            // Outer glow ring
+            let glowR = node.r * (1.0 + act * 0.8)
+            ctx.addEllipse(in: CGRect(x:node.x-glowR, y:node.y-glowR,
+                                      width:glowR*2, height:glowR*2))
+            ctx.setFillColor(node.color.withAlphaComponent(act * 0.35).cgColor)
+            ctx.fillPath()
+
+            // Core dot
+            let coreR = node.r * 0.38 * (0.6 + act * 0.7)
+            ctx.addEllipse(in: CGRect(x:node.x-coreR, y:node.y-coreR,
+                                      width:coreR*2, height:coreR*2))
+            ctx.setFillColor(node.color.withAlphaComponent(0.5 + act * 0.5).cgColor)
+            ctx.fillPath()
+
+            // Bright centre highlight
+            let sparkR = coreR * 0.45
+            ctx.addEllipse(in: CGRect(x:node.x-sparkR, y:node.y+coreR*0.2-sparkR,
+                                      width:sparkR*2, height:sparkR*2))
+            ctx.setFillColor(NSColor.white.withAlphaComponent(act * 0.6).cgColor)
+            ctx.fillPath()
+        }
     }
 
-    private func drawFace(ctx: CGContext) {
-        // ── Eyes ──────────────────────────────────────────────────────
+    // MARK: - Face
+
+    private func drawFace(_ ctx: CGContext) {
         let eyeY: CGFloat = 10
-        for ex in [-28.0, 28.0] as [CGFloat] {
-            // Eye white
-            ctx.addEllipse(in: CGRect(x: ex-16, y: eyeY-18, width: 32, height: blinking ? 5 : 32))
-            ctx.setFillColor(NSColor.white.cgColor)
-            ctx.fillPath()
-
+        for ex: CGFloat in [-28, 28] {
+            // White
+            ctx.addEllipse(in: CGRect(x:ex-15, y:eyeY-17, width:30, height: blinking ? 4 : 30))
+            ctx.setFillColor(NSColor.white.cgColor); ctx.fillPath()
             if !blinking {
-                // Iris – purple (matches reference)
-                ctx.addEllipse(in: CGRect(x: ex-11, y: eyeY-13, width: 22, height: 22))
-                ctx.setFillColor(NSColor(red: 0.45, green: 0.25, blue: 0.75, alpha: 1).cgColor)
+                // Iris
+                ctx.addEllipse(in: CGRect(x:ex-10, y:eyeY-12, width:20, height:20))
+                ctx.setFillColor(NSColor(red:0.45, green:0.25, blue:0.75, alpha:1).cgColor)
                 ctx.fillPath()
-
                 // Pupil
-                ctx.addEllipse(in: CGRect(x: ex-6, y: eyeY-8, width: 12, height: 12))
-                ctx.setFillColor(NSColor.black.cgColor)
-                ctx.fillPath()
-
+                ctx.addEllipse(in: CGRect(x:ex-6, y:eyeY-8, width:12, height:12))
+                ctx.setFillColor(NSColor.black.cgColor); ctx.fillPath()
                 // Shine
-                ctx.addEllipse(in: CGRect(x: ex-8, y: eyeY+0, width: 7, height: 7))
-                ctx.addEllipse(in: CGRect(x: ex+2, y: eyeY+4, width: 4, height: 4))
-                ctx.setFillColor(NSColor.white.cgColor)
-                ctx.fillPath()
+                ctx.addEllipse(in: CGRect(x:ex-7, y:eyeY+0, width:6, height:6))
+                ctx.addEllipse(in: CGRect(x:ex+1, y:eyeY+3, width:3.5, height:3.5))
+                ctx.setFillColor(NSColor.white.cgColor); ctx.fillPath()
             }
         }
-
-        // ── Eyebrows ──────────────────────────────────────────────────
-        let browY: CGFloat = 30
-        ctx.setStrokeColor(NSColor(red: 0.35, green: 0.18, blue: 0.18, alpha: 0.9).cgColor)
-        ctx.setLineWidth(4)
-        ctx.setLineCap(.round)
-        for ex in [-28.0, 28.0] as [CGFloat] {
-            let tilt: CGFloat = gpuLoad > 0.6 ? (ex < 0 ? 6 : -6) : 0  // angry at high load
-            let p = CGMutablePath()
-            p.move(to: CGPoint(x: ex - 10, y: browY + tilt))
-            p.addCurve(to: CGPoint(x: ex + 10, y: browY - tilt),
-                       control1: CGPoint(x: ex - 5, y: browY + 4 + tilt),
-                       control2: CGPoint(x: ex + 5, y: browY - 4 - tilt))
-            ctx.addPath(p); ctx.strokePath()
-        }
-
-        // ── Blush cheeks ──────────────────────────────────────────────
-        for cx in [-45.0, 45.0] as [CGFloat] {
-            ctx.addEllipse(in: CGRect(x: cx-14, y: -8, width: 28, height: 16))
-            ctx.setFillColor(NSColor(red: 1, green: 0.5, blue: 0.6, alpha: 0.45).cgColor)
+        // Blush
+        for cx: CGFloat in [-44, 44] {
+            ctx.addEllipse(in: CGRect(x:cx-13, y:-7, width:26, height:15))
+            ctx.setFillColor(NSColor(red:1, green:0.50, blue:0.60, alpha:0.40).cgColor)
             ctx.fillPath()
         }
-
-        // ── Mouth ─────────────────────────────────────────────────────
-        // Happy / open smile intensity at high load
-        let smileOpen = gpuLoad > 0.5
-        ctx.setFillColor(NSColor(red: 0.35, green: 0.18, blue: 0.18, alpha: 0.9).cgColor)
-        ctx.setStrokeColor(NSColor(red: 0.35, green: 0.18, blue: 0.18, alpha: 0.9).cgColor)
-        ctx.setLineWidth(3.5)
-        ctx.setLineCap(.round)
-        let mp = CGMutablePath()
-        mp.move(to: CGPoint(x: -16, y: -20))
-        mp.addQuadCurve(to: CGPoint(x: 16, y: -20),
-                        control: CGPoint(x: 0, y: smileOpen ? -36 : -30))
-        ctx.addPath(mp); ctx.strokePath()
-
-        // Teeth when smiling wide
-        if smileOpen {
-            ctx.addEllipse(in: CGRect(x: -10, y: -30, width: 20, height: 12))
-            ctx.setFillColor(NSColor.white.cgColor)
-            ctx.fillPath()
-        }
-
-        // ── Raised finger at very high load ───────────────────────────
-        if gpuLoad > 0.7 {
-            drawFinger(ctx: ctx)
-        }
-    }
-
-    private func drawFinger(ctx: CGContext) {
-        ctx.saveGState()
-        ctx.translateBy(x: -68, y: 5)
-        // Arm
-        ctx.setFillColor(NSColor(red: 1, green: 0.75, blue: 0.82, alpha: 1).cgColor)
-        let arm = CGMutablePath()
-        arm.addRoundedRect(in: CGRect(x: -8, y: 0, width: 16, height: 35), cornerWidth: 8, cornerHeight: 8)
-        ctx.addPath(arm); ctx.fillPath()
-        // Finger
-        let finger = CGMutablePath()
-        finger.addRoundedRect(in: CGRect(x: -5, y: 28, width: 10, height: 22), cornerWidth: 5, cornerHeight: 5)
-        ctx.addPath(finger); ctx.fillPath()
-        ctx.restoreGState()
-    }
-
-    private func drawParticles(ctx: CGContext, unit: CGFloat, bounceY: CGFloat) {
-        for p in particles {
-            let alpha = (1 - p.life / p.maxLife) * 0.9
-            let r = max(1, (1 - p.life / p.maxLife) * 5)
-            let col = p.color.withAlphaComponent(alpha)
-            ctx.addEllipse(in: CGRect(x: p.x / unit - r, y: p.y / unit - r,
-                                       width: r*2, height: r*2))
-            ctx.setFillColor(col.cgColor)
-            ctx.fillPath()
-        }
+        // Smile — gets wider with activity
+        let activity = (gpuLoad + cpuLoad) / 2
+        ctx.setStrokeColor(NSColor(red:0.35, green:0.18, blue:0.18, alpha:0.85).cgColor)
+        ctx.setLineWidth(3); ctx.setLineCap(.round)
+        let sm = CGMutablePath()
+        sm.move(to: CGPoint(x:-15, y:-20))
+        sm.addQuadCurve(to: CGPoint(x:15, y:-20),
+                        control: CGPoint(x:0, y: -28 - activity * 8))
+        ctx.addPath(sm); ctx.strokePath()
     }
 }
