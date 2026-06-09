@@ -42,6 +42,7 @@
 		BB100000000000000000014 /* LLMStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000050 /* LLMStatusView.swift */; };
 		BB100000000000000000016 /* BrainAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000052 /* BrainAnimationView.swift */; };
 		BB100000000000000000015 /* ScreenSaver.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB000000000000000000003 /* ScreenSaver.framework */; };
+		BB100000000000000000017 /* BrainCharacter.png in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000005 /* BrainCharacter.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -68,6 +69,7 @@
 		BB000000000000000000001 /* GPUMonitorSaverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPUMonitorSaverView.swift; sourceTree = "<group>"; };
 		BB000000000000000000002 /* Saver-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Saver-Info.plist; sourceTree = "<group>"; };
 		BB000000000000000000003 /* ScreenSaver.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ScreenSaver.framework; path = System/Library/Frameworks/ScreenSaver.framework; sourceTree = SDKROOT; };
+		BB000000000000000000005 /* BrainCharacter.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BrainCharacter.png; sourceTree = "<group>"; };
 		BB000000000000000000004 /* GPUMonitorSaver.saver */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GPUMonitorSaver.saver; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -165,6 +167,7 @@
 				BB000000000000000000001 /* GPUMonitorSaverView.swift */,
 				BB000000000000000000002 /* Saver-Info.plist */,
 				BB000000000000000000003 /* ScreenSaver.framework */,
+				BB000000000000000000005 /* BrainCharacter.png */,
 			);
 			path = ScreenSaver;
 			sourceTree = "<group>";
@@ -256,6 +259,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BB100000000000000000017 /* BrainCharacter.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
