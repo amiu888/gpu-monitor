@@ -45,6 +45,11 @@ final class DashboardViewController: NSViewController {
 
         view.addSubview(outerStack)
         outerStack.translatesAutoresizingMaskIntoConstraints = false
+
+        // Close button — top-left corner, macOS traffic-light style
+        let closeBtn = makeCloseButton()
+        view.addSubview(closeBtn)
+
         NSLayoutConstraint.activate([
             outerStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
             outerStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
@@ -52,6 +57,10 @@ final class DashboardViewController: NSViewController {
             outerStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -10),
             bottomBar.heightAnchor.constraint(equalToConstant: 28),
             ssBtn.widthAnchor.constraint(equalToConstant: 128),
+            closeBtn.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            closeBtn.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
+            closeBtn.widthAnchor.constraint(equalToConstant: 14),
+            closeBtn.heightAnchor.constraint(equalToConstant: 14),
         ])
 
         monitor.$latest
@@ -63,6 +72,29 @@ final class DashboardViewController: NSViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] history in self?.updateSparklines(history) }
             .store(in: &cancellables)
+    }
+
+    // MARK: - Close button
+
+    private func makeCloseButton() -> NSView {
+        let btn = NSButton(frame: .zero)
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        btn.bezelStyle = .circular
+        btn.isBordered = false
+        btn.wantsLayer = true
+        btn.layer?.cornerRadius = 7
+        btn.layer?.backgroundColor = NSColor(red: 1, green: 0.37, blue: 0.34, alpha: 1).cgColor
+        btn.title = ""
+        btn.target = self
+        btn.action = #selector(closePanel)
+
+        // Draw the × symbol on hover via tracking area
+        btn.toolTip = "Close"
+        return btn
+    }
+
+    @objc private func closePanel() {
+        NSApplication.shared.terminate(nil)
     }
 
     // MARK: - Screen Saver button
