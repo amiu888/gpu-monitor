@@ -1,0 +1,25 @@
+# Xcode build output
+build/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Compiled screen saver (build artifact)
+*.saver
+
+# Xcode user schemes (keep shared schemes if any)
+xcuserdata/
