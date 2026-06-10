@@ -26,6 +26,7 @@
 		AA000000000000000000053 /* BrainAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000052 /* BrainAnimationView.swift */; };
 		AA000000000000000000061 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000012 /* Info.plist */; };
 		AA000000000000000000062 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000013 /* AppIcon.icns */; };
+		AA000000000000000000063 /* BrainCharacter.png in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000005 /* BrainCharacter.png */; };
 		BB100000000000000000001 /* GPUMonitorSaverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000001 /* GPUMonitorSaverView.swift */; };
 		BB100000000000000000002 /* SystemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000020 /* SystemMonitor.swift */; };
 		BB100000000000000000003 /* GPUStatsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000022 /* GPUStatsProvider.swift */; };
@@ -252,6 +253,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA000000000000000000062 /* AppIcon.icns in Resources */,
+				AA000000000000000000063 /* BrainCharacter.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
