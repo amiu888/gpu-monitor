@@ -37,11 +37,11 @@ class GPUMonitorSaverView: ScreenSaverView {
         let W = bounds.width, H = bounds.height
         let p = isPreview
 
-        // ── Brain (top half) ───────────────────────────────────────────
-        let brainH = H * (p ? 0.48 : 0.46)
+        // ── Brain (lower half, below the macOS system clock) ──────────
+        let brainH = H * (p ? 0.44 : 0.42)
         let brainW = brainH
         let brainX = (W - brainW) / 2
-        let brainY = H * (p ? 0.46 : 0.46)
+        let brainY = H * (p ? 0.08 : 0.10)
 
         let brain = BrainAnimationView(frame: NSRect(x: brainX, y: brainY, width: brainW, height: brainH))
         brain.wantsLayer = true
