@@ -6,6 +6,10 @@ final class DashboardViewController: NSViewController {
     let monitor = SystemMonitor()
     private var cancellables = Set<AnyCancellable>()
 
+    // Small brain in the corner
+    private let brainView   = BrainAnimationView()
+    private var brainTimer: Timer?
+
     // Cards
     private let gpuCard     = MetricCardView()
     private let gpuTempCard = MetricCardView()
@@ -16,7 +20,7 @@ final class DashboardViewController: NSViewController {
     private let llmView     = LLMStatusView()
 
     override func loadView() {
-        let v = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 280))
+        let v = NSView(frame: NSRect(x: 0, y: 0, width: 760, height: 280))
         v.wantsLayer = true
         self.view = v
     }
@@ -43,20 +47,34 @@ final class DashboardViewController: NSViewController {
         outerStack.orientation = .vertical
         outerStack.spacing = 6
 
+        // ── Brain view (right side, full height) ────────────────────
+        brainView.wantsLayer = true
+        brainView.translatesAutoresizingMaskIntoConstraints = false
+
         view.addSubview(outerStack)
+        view.addSubview(brainView)
         outerStack.translatesAutoresizingMaskIntoConstraints = false
 
         // Close button — top-left corner, macOS traffic-light style
         let closeBtn = makeCloseButton()
         view.addSubview(closeBtn)
 
+        let brainW: CGFloat = 200
+
         NSLayoutConstraint.activate([
+            // Brain on the right
+            brainView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
+            brainView.topAnchor.constraint(equalTo: view.topAnchor),
+            brainView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            brainView.widthAnchor.constraint(equalToConstant: brainW),
+
+            // Cards take the remaining left width
             outerStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            outerStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            outerStack.trailingAnchor.constraint(equalTo: brainView.leadingAnchor, constant: -6),
             outerStack.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
             outerStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -10),
             bottomBar.heightAnchor.constraint(equalToConstant: 28),
-            ssBtn.widthAnchor.constraint(equalToConstant: 128),
+            ssBtn.widthAnchor.constraint(equalToConstant: 120),
             closeBtn.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
             closeBtn.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
             closeBtn.widthAnchor.constraint(equalToConstant: 14),
@@ -72,6 +90,16 @@ final class DashboardViewController: NSViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] history in self?.updateSparklines(history) }
             .store(in: &cancellables)
+
+        // 60 fps brain animation timer
+        brainTimer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
+            self?.brainView.advance(by: 1.0/60.0)
+        }
+    }
+
+    override func viewWillDisappear() {
+        super.viewWillDisappear()
+        brainTimer?.invalidate()
     }
 
     // MARK: - Close button
@@ -135,6 +163,12 @@ final class DashboardViewController: NSViewController {
     // MARK: - Updates
 
     private func update(_ snap: SystemSnapshot) {
+        // Feed brain animation
+        brainView.gpuLoad  = CGFloat(snap.gpuUtilization)
+        brainView.cpuLoad  = CGFloat(snap.cpuUtilization)
+        brainView.llmOnGPU = snap.llmModels.first?.processor.lowercased().contains("gpu") == true
+        brainView.llmOnCPU = snap.llmModels.first?.processor.lowercased().contains("cpu") == true
+
         gpuCard.gaugeView.value = snap.gpuUtilization
         gpuCard.valueLabel.stringValue = "\(Int(snap.gpuUtilization * 100))%"
 

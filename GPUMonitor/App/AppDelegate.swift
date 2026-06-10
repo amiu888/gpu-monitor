@@ -125,7 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func defaultFrame() -> NSRect {
         let screen = NSScreen.main ?? NSScreen.screens[0]
         let visible = screen.visibleFrame
-        let w: CGFloat = 680, h: CGFloat = 280
+        let w: CGFloat = 760, h: CGFloat = 280
         return NSRect(x: visible.maxX - w - 20, y: visible.maxY - h - 20, width: w, height: h)
     }
 
